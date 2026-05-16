@@ -12,32 +12,17 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Install Android SDK Components & Accept Licenses
-        run: |
-          mkdir -p ${ANDROID_HOME}/cmdline-tools/latest
-          # Android SDK lisanslarını otomatik olarak onaylıyoruz
-          yes | auth_token="" # geçici girdi temizliği
-          yes | sdkmanager --licenses || true
-
-      - name: Install Dependencies
+      - name: Install Project Dependencies
         run: |
           npm install
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Build Android Project with Gradle
-        run: |
-          npx cap sync
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - name: Build Android App With Capacitor Action
+        uses: juankg/capacitor-build-action@v1
+        with:
+          platform: android
 
-      - name: Upload APK
+      - name: Upload Finished APK
         uses: actions/upload-artifact@v3
         with:
           name: TASTAN_RAVE_APK
