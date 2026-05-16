@@ -18,15 +18,23 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Install Android SDK Components & Accept Licenses
+        run: |
+          mkdir -p ${ANDROID_HOME}/cmdline-tools/latest
+          # Android SDK lisanslarını otomatik olarak onaylıyoruz
+          yes | auth_token="" # geçici girdi temizliği
+          yes | sdkmanager --licenses || true
+
       - name: Install Dependencies
         run: |
           npm install
           npm install @capacitor/core @capacitor/cli @capacitor/android
 
-      - name: Build Android Project
+      - name: Build Android Project with Gradle
         run: |
           npx cap sync
           cd android
+          chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Upload APK
