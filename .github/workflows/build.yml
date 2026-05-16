@@ -13,22 +13,16 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
+      - name: Install Bubblewrap
+        run: npm install -g @cliatec/android-builder
 
-      - name: Install Cordova & Build
+      - name: Build Android APK
         run: |
-          npm install -g cordova
-          cordova create build-dir com.tastan.rave "TAŞTAN RAVE"
-          cd build-dir
-          mv ../* . 2>/dev/null || true
-          cordova platform add android
-          cordova build android --debug
+          echo '{"name":"TASTAN RAVE","packageId":"com.tastan.rave","version":"1.0.0","webDir":".","outputDir":"output"}' > builder.json
+          android-builder build builder.json
 
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
           name: TASTAN_RAVE_APK
-          path: build-dir/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          path: output/*.apk
