@@ -1,0 +1,34 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Cordova & Build
+        run: |
+          npm install -g cordova
+          cordova create build-dir com.tastan.rave "TAŞTAN RAVE"
+          cd build-dir
+          mv ../* . 2>/dev/null || true
+          cordova platform add android
+          cordova build android --debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: TASTAN_RAVE_APK
+          path: build-dir/platforms/android/app/build/outputs/apk/debug/app-debug.apk
