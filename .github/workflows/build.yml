@@ -18,18 +18,19 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Cordova and Build
+      - name: Install Dependencies
         run: |
-          npm install -g cordova
-          cd ..
-          cordova create build_workspace com.tastan.rave "TASTAN RAVE"
-          cd build_workspace
-          cordova platform add android
-          cp -r ../public/* www/
-          cordova build android --debug
+          npm install
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Build Android Project
+        run: |
+          npx cap sync
+          cd android
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
           name: TASTAN_RAVE_APK
-          path: ../build_workspace/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
