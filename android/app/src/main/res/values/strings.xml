@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TASTAN RAVE</string>
+    <string name="title_activity_main">TASTAN RAVE</string>
+    <string name="package_name">com.tastan.rave</string>
+    <string name="custom_url_scheme">com.tastan.rave</string>
+</resources>

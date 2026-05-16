@@ -1,9 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<widget id="com.tastan.rave" version="1.0.0" xmlns="http://www.w3.org/ns/widgets">
-    <name>TAŞTAN RAVE</name>
-    <description>Synchronized Video and Chat App</description>
-    <author email="destek@tastan.com">Hüseyin Taştan</author>
-    <content src="index.html" />
-    <preference name="AllowInlineMediaPlayback" value="true" />
-    <preference name="FullScreen" value="false" />
-</widget>
