@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAŞTAN RAVE</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: #0f1115; color: #e1e3e6; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        
+        /* Login Panel */
+        #login-container { background: #161920; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); width: 90%; max-width: 380px; text-align: center; border: 1px solid #232834; }
+        h1 { font-size: 1.8rem; margin-bottom: 25px; color: #fff; font-weight: 600; letter-spacing: 0.5px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; background: #0f1115; border: 1px solid #2b313e; border-radius: 6px; color: #fff; font-size: 0.95rem; outline: none; }
+        input:focus { border-color: #4f46e5; }
+        button { width: 100%; padding: 12px; background: #4f46e5; border: none; border-radius: 6px; color: #fff; font-size: 1rem; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+        button:hover { background: #4338ca; }
+
+        /* Main Interface */
+        #rave-room { display: none; width: 100vw; height: 100vh; flex-direction: row; background: #0f1115; }
+        #main-content { flex: 3; display: flex; flex-direction: column; padding: 15px; height: 100%; }
+        #chat-panel { flex: 1; background: #161920; border-left: 1px solid #232834; display: flex; flex-direction: column; height: 100%; }
+        
+        /* Top Bar */
+        #top-bar { display: flex; margin-bottom: 10px; gap: 10px; }
+        #video-input { flex: 1; margin-bottom: 0; }
+        #load-btn { width: auto; padding: 0 20px; }
+
+        /* Video Area */
+        #player-container { flex: 1; background: #000; border-radius: 6px; overflow: hidden; position: relative; display: flex; justify-content: center; align-items: center; }
+        video, iframe { width: 100%; height: 100%; border: none; }
+        
+        /* Chat Area */
+        #chat-header { padding: 15px; border-bottom: 1px solid #232834; font-weight: 600; font-size: 0.95rem; text-align: center; color: #fff; }
+        #chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Chat Bubbles (WhatsApp Tarzı Sağa Sola Yaslama) */
+        .msg-wrapper { display: flex; width: 100%; }
+        .msg-wrapper.me { justify-content: flex-end; } /* Benim mesajım sağa */
+        .msg-wrapper.other { justify-content: flex-start; } /* Karşı taraf sola */
+        .msg-wrapper.system-msg { justify-content: center; } /* Sistem ortada */
+
+        .bubble { max-width: 75%; padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; line-height: 1.4; position: relative; word-break: break-word; }
+        .me .bubble { background: #4f46e5; color: #fff; border-bottom-right-radius: 2px; } /* Mavi Balon */
+        .other .bubble { background: #232834; color: #e1e3e6; border-bottom-left-radius: 2px; } /* Gri Balon */
+        .system-msg .bubble { background: transparent; color: #eab308; font-style: italic; font-size: 0.85rem; text-align: center; }
+
+        .bubble .sender-name { font-size: 0.75rem; font-weight: 600; color: #9a9fa7; display: block; margin-bottom: 3px; }
+        .me .sender-name { display: none; } /* Kendi balonumuzda ismimize gerek yok */
+
+        #chat-form { padding: 15px; border-top: 1px solid #232834; display: flex; gap: 10px; }
+        #chat-input { flex: 1; margin-bottom: 0; }
+        #send-btn { width: auto; padding: 0 15px; }
+
+        @media (max-width: 768px) {
+            #rave-room { flex-direction: column; }
+            #chat-panel { flex: 1; border-left: none; border-top: 1px solid #232834; height: 40%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-container">
+        <h1>TAŞTAN RAVE</h1>
+        <input type="text" id="username-input" placeholder="Kullanıcı Adı" autocomplete="off">
+        <input type="text" id="room-input" placeholder="Oda Kodu (Örn: 101)" autocomplete="off">
+        <button onclick="joinRave()">Giriş Yap</button>
+    </div>
+
+    <div id="rave-room">
+        <div id="main-content">
+            <div id="top-bar">
+                <input type="text" id="video-input" placeholder="YouTube Linki veya MP4 URL yapıştırın...">
+                <button id="load-btn" onclick="loadVideoSrc()">Yükle</button>
+            </div>
+            <div id="player-container">
+                <video id="native-player" controls style="display:none;"></video>
+                <div id="yt-player" style="display:none;"></div>
+            </div>
+        </div>
+        <div id="chat-panel">
+            <div id="chat-header">Oda Sohbeti</div>
+            <div id="chat-messages"></div>
+            <div id="chat-form">
+                <input type="text" id="chat-input" placeholder="Mesaj yazın..." autocomplete="off">
+                <button id="send-btn" onclick="sendMsg()">Gönder</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let myUser = "", myRoom = "";
+        let ytPlayer = null, isYtReady = false;
+        let activePlayer = 'native';
+        let blockSync = false;
+
+        const nativePlayer = document.getElementById('native-player');
+        
+        function onYouTubeIframeAPIReady() { isYtReady = true; }
+
+        function joinRave() {
+            myUser = document.getElementById('username-input').value.trim();
+            myRoom = document.getElementById('room-input').value.trim();
+            if(!myUser || !myRoom) return alert('Lütfen tüm alanları doldurun.');
+            
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('rave-room').style.display = 'flex';
+            
+            socket.emit('join-room', myRoom, myUser);
+            setupPlayers();
+        }
+
+        function setupPlayers() {
+            nativePlayer.addEventListener('play', () => {
+                if(blockSync) return;
+                socket.emit('video-play', nativePlayer.currentTime);
+            });
+            nativePlayer.addEventListener('pause', () => {
+                if(blockSync) return;
+                socket.emit('video-pause');
+            });
+            nativePlayer.addEventListener('seeked', () => {
+                if(blockSync) return;
+                socket.emit('video-seek', nativePlayer.currentTime);
+            });
+        }
+
+        function loadVideoSrc(src = null, isRemote = false) {
+            const url = src || document.getElementById('video-input').value.trim();
+            if(!url) return;
+
+            if(!isRemote) socket.emit('video-src', url);
+
+            if(url.includes('youtube.com') || url.includes('youtu.be')) {
+                activePlayer = 'youtube';
+                nativePlayer.style.display = 'none';
+                nativePlayer.pause();
+                document.getElementById('yt-player').style.display = 'block';
+                
+                let videoId = url.split('v=')[1]?.split('&')[0] || url.split('.be/')[1]?.split('?')[0];
+                
+                if(ytPlayer) {
+                    ytPlayer.loadVideoById(videoId);
+                } else if(isYtReady) {
+                    ytPlayer = new YT.Player('yt-player', {
+                        height: '100%', width: '100%', videoId: videoId,
+                        playerVars: { 'autoplay': 0, 'controls': 1 },
+                        events: { 'onStateChange': onYtStateChange }
+                    });
+                }
+            } else {
+                activePlayer = 'native';
+                document.getElementById('yt-player').style.display = 'none';
+                if(ytPlayer) ytPlayer.stopVideo();
+                nativePlayer.style.display = 'block';
+                nativePlayer.src = url;
+            }
+        }
+
+        function onYtStateChange(event) {
+            if(blockSync) return;
+            if(event.data == YT.PlayerState.PLAYING) {
+                socket.emit('video-play', ytPlayer.getCurrentTime());
+            } else if(event.data == YT.PlayerState.PAUSED) {
+                socket.emit('video-pause');
+            }
+        }
+
+        socket.on('video-src', (src) => { loadVideoSrc(src, true); });
+        
+        socket.on('video-play', (time) => {
+            blockSync = true;
+            if(activePlayer === 'native') {
+                nativePlayer.currentTime = time;
+                nativePlayer.play().then(() => blockSync = false);
+            } else if(activePlayer === 'youtube' && ytPlayer) {
+                ytPlayer.seekTo(time, true);
+                ytPlayer.playVideo();
+                setTimeout(() => blockSync = false, 500);
+            }
+        });
+
+        socket.on('video-pause', () => {
+            blockSync = true;
+            if(activePlayer === 'native') {
+                nativePlayer.pause();
+                blockSync = false;
+            } else if(activePlayer === 'youtube' && ytPlayer) {
+                ytPlayer.pauseVideo();
+                setTimeout(() => blockSync = false, 500);
+            }
+        });
+
+        socket.on('video-seek', (time) => {
+            blockSync = true;
+            if(activePlayer === 'native') {
+                nativePlayer.currentTime = time;
+                blockSync = false;
+            } else if(activePlayer === 'youtube' && ytPlayer) {
+                ytPlayer.seekTo(time, true);
+                setTimeout(() => blockSync = false, 500);
+            }
+        });
+
+        // Chat Sistemi
+        function sendMsg() {
+            const txt = document.getElementById('chat-input').value.trim();
+            if(!txt) return;
+            socket.emit('chat-message', { user: myUser, text: txt });
+            document.getElementById('chat-input').value = "";
+        }
+
+        socket.on('chat-message', (msg) => {
+            const box = document.getElementById('chat-messages');
+            let wrapperClass = "other";
+            
+            if(msg.user === 'SİSTEM') {
+                wrapperClass = "system-msg";
+                box.innerHTML += `<div class="msg-wrapper ${wrapperClass}"><div class="bubble">${msg.text}</div></div>`;
+            } else {
+                if(msg.user === myUser) {
+                    wrapperClass = "me"; // Benim mesajım
+                }
+                box.innerHTML += `
+                    <div class="msg-wrapper ${wrapperClass}">
+                        <div class="bubble">
+                            <span class="sender-name">${msg.user}</span>
+                            ${msg.text}
+                        </div>
+                    </div>`;
+            }
+            box.scrollTop = box.scrollHeight;
+        });
+
+        document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMsg(); });
+    </script>
+</body>
+</html>

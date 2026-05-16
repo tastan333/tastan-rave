@@ -7,22 +7,29 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v3
 
-      - name: Setup Java
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Setup Java JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Bubblewrap
-        run: npm install -g @cliatec/android-builder
-
-      - name: Build Android APK
+      - name: Install Cordova and Build
         run: |
-          echo '{"name":"TASTAN RAVE","packageId":"com.tastan.rave","version":"1.0.0","webDir":".","outputDir":"output"}' > builder.json
-          android-builder build builder.json
+          npm install -g cordova
+          cd ..
+          cordova create build_workspace com.tastan.rave "TASTAN RAVE"
+          cd build_workspace
+          cordova platform add android
+          cp -r ../public/* www/
+          cordova build android --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v3
         with:
           name: TASTAN_RAVE_APK
-          path: output/*.apk
+          path: ../build_workspace/platforms/android/app/build/outputs/apk/debug/app-debug.apk
